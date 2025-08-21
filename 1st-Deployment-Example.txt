@@ -1,0 +1,101 @@
+#!/bin/bash
+
+#====================== Project Configuration ==========================
+
+PROJECT_NAME="MyFrontendApp"       # ✅ Name of your project
+PORT=3000                          # ✅ Port on which you want to run your application (e.g., 3000)
+
+#----------- GitHub details required for Deployment -------------------
+
+GITHUB_USERNAME="Avinash001"       # ✅ Your GitHub username
+GITHUB_ACCESSTOKEN="ghp_xxxxx"     # ✅ GitHub Personal Access Token with repo access (replace with real token)
+GITHUB_REPOSITORY="Avinash001/demoapplication"   # ✅ Format: username/repo_name
+CLONED_REPO_NAME="demoapplication" # ✅ This is the name of the folder that will be created after cloning
+GITHUB_Remote_BRANCH_NAME="main"   # ✅ Branch you want to deploy from (e.g., "main" or "dev")
+
+#------------------------ Deployment Directory -------------------------
+
+Deployment_DIR_Name="myapp"        # ✅ Folder under /var/www/html where build files will be served
+
+#=======================================================================
+
+echo "============================================="
+echo "🚀 Starting deployment process for $PROJECT_NAME"
+echo "============================================="
+
+
+# Step 1: Kill any process using the specified port (clean start)
+echo "🔍 Checking if any process is running on port $PORT..."
+PID=$(lsof -t -i:$PORT)
+
+if [ -n "$PID" ]; then
+  echo "⚠️  Process found on port $PORT (PID: $PID). Terminating it..."
+  kill -9 $PID
+  echo "✅ Process (PID: $PID) has been terminated."
+else
+  echo "✅ No process is currently running on port $PORT."
+fi
+
+# Step 2: Create or reset the deployment directory
+if [ -d "/var/www/html/$Deployment_DIR_Name" ]; then
+  echo "🗑️ Directory '/var/www/html/$Deployment_DIR_Name' already exists. Removing..."
+  rm -rf "/var/www/html/$Deployment_DIR_Name"
+else
+  echo "📁 Creating directory '/var/www/html/$Deployment_DIR_Name'..."
+fi
+
+mkdir -p "/var/www/html/$Deployment_DIR_Name"
+
+# Step 3: Clone the GitHub repo using token (for private or public repos)
+echo "📥 Cloning repository..."
+git clone "https://${GITHUB_USERNAME}:${GITHUB_ACCESSTOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+# Step 4: Change into the cloned directory and checkout correct branch
+cd "$CLONED_REPO_NAME" || { echo "❌ Failed to access cloned directory"; exit 1; }
+
+echo "🔄 Switching to branch '$GITHUB_Remote_BRANCH_NAME'..."
+git checkout "$GITHUB_Remote_BRANCH_NAME"
+
+# Step 5: Check for a build folder and move contents to deployment directory
+# 📝 Assumes you have already run `npm run build` locally or in CI
+if [ -d "build" ]; then
+  echo "📦 Moving build files to deployment directory..."
+  mv build/* "/var/www/html/$Deployment_DIR_Name"
+  echo "✅ Files moved successfully"
+else
+  echo "❌ Build directory not found. Make sure the project is built before deploying."
+  exit 1
+fi
+
+# Step 6: Serve the static files using `serve`
+# This starts a lightweight Node.js server to serve your app
+echo "🚀 Starting frontend server on port $PORT..."
+cd /var/www/html
+serve -s "$Deployment_DIR_Name" -l "$PORT" &>> "$Deployment_DIR_Name.log" &
+
+# Step 7: Wait and verify the app is running
+echo "⏳ Waiting for the frontend to start..."
+sleep 5
+NEW_PID=$(lsof -t -i:$PORT)
+
+if [ -n "$NEW_PID" ]; then
+  echo "✅ Frontend is live on port $PORT (PID: $NEW_PID)."
+else
+  echo "❌ Frontend failed to start. Please check '/var/www/html/$Deployment_DIR_Name.log' for details."
+fi
+
+# Final log
+echo "============================================="
+echo "✅ $PROJECT_NAME deployment completed"
+echo "============================================="
+#=======================================================Variables ===================================================================================================================
+| Variable                    | Example Value                  | Explanation                                                  |
+| --------------------------- | ------------------------------ | ------------------------------------------------------------ |
+| `PROJECT_NAME`              | `"MyFrontendApp"`              | Name of your app, shown in logs                              |
+| `PORT`                      | `3000`                         | The port where the app will be served                        |
+| `GITHUB_USERNAME`           | `"Avinash001"`                 | Your GitHub username                                         |
+| `GITHUB_ACCESSTOKEN`        | `"ghp_abcd1234..."`            | GitHub token (keep secret, has access to clone private repo) |
+| `GITHUB_REPOSITORY`         | `"Avinash001/demoapplication"` | Format: `<username>/<repo>`                                  |
+| `CLONED_REPO_NAME`          | `"demoapplication"`            | Folder name after git clone                                  |
+| `GITHUB_Remote_BRANCH_NAME` | `"main"`                       | Branch to deploy from                                        |
+| `Deployment_DIR_Name`       | `"myapp"`                      | Target folder under `/var/www/html`                          |
