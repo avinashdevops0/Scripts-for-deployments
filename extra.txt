@@ -1,0 +1,10 @@
+PIDS=$(lsof -t -i:5000)
+
+if [ -n "$PIDS" ]; then
+    echo "⚠️  Process found on port 5000 (PID: $PIDS). Terminating it..."
+    for PID in $PIDS; do
+        kill $PID
+    done
+else
+    echo "✅ No process running on port 5000."
+fi
